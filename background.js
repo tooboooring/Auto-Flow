@@ -3,7 +3,7 @@
 // Uses direct API calls to Google Flow — no DOM interaction.
 // ============================================================
 
-const RECAPTCHA_SITE_KEY = "6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV";
+let cachedRecaptchaKey = null;
 
 let cachedToken = null;
 let tokenTimestamp = 0;
@@ -128,18 +128,51 @@ async function getProjectId(tabId) {
   return result?.[0]?.result || null;
 }
 
-// ---- Get reCAPTCHA token from the page ----
+// ---- Get reCAPTCHA site key dynamically ----
 
-async function getRecaptchaToken(tabId, action = "IMAGE_GENERATION") {
+async function getDynamicSiteKey(tabId) {
+  if (cachedRecaptchaKey) return cachedRecaptchaKey;
+
   const result = await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
-    func: (siteKey, recaptchaAction) => {
+    func: () => {
+      // 1. Inspect script tags for the reCAPTCHA render parameter
+      const scripts = Array.from(document.querySelectorAll("script"));
+      for (const script of scripts) {
+        const match = (script.src || "").match(/recaptcha\/enterprise\.js\?render=([A-Za-z0-9_-]+)/);
+        if (match) return match[1];
+      }
+      // 2. We could add more scraping logic here if Google obfuscates it
+      return null;
+    }
+  }).catch(() => null);
+
+  let key = result?.[0]?.result;
+  
+  // Fallback to the last known working key if we couldn't find it
+  if (!key) {
+    key = "6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV";
+  }
+  
+  cachedRecaptchaKey = key;
+  return key;
+}
+
+// ---- Get reCAPTCHA token from the page ----
+
+async function getRecaptchaToken(tabId, action = "IMAGE_GENERATION") {
+  const siteKey = await getDynamicSiteKey(tabId);
+
+  const result = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    func: (key, recaptchaAction) => {
       const re = window.grecaptcha?.enterprise;
       // In Chrome, returning a Promise from executeScript works correctly
-      return re ? re.execute(siteKey, { action: recaptchaAction }) : Promise.resolve(null);
+      return re ? re.execute(key, { action: recaptchaAction }) : Promise.resolve(null);
     },
-    args: [RECAPTCHA_SITE_KEY, action]
+    args: [siteKey, action]
   }).catch(() => null);
 
   return result?.[0]?.result || null;

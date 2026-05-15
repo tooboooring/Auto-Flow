@@ -1,0 +1,180 @@
+// ============================================================
+// Auto Flow - Side Panel Script (Chrome)
+// Handles UI interaction and communicates with the background
+// ============================================================
+
+const startBtn = document.getElementById("startBtn");
+const stopBtn = document.getElementById("stopBtn");
+const promptList = document.getElementById("promptList");
+const logContainer = document.getElementById("logContainer");
+const summary = document.getElementById("summary");
+const statusDot = document.getElementById("statusDot");
+const statusText = document.getElementById("statusText");
+const uploadBtn = document.getElementById("uploadBtn");
+const fileInput = document.getElementById("fileInput");
+const promptCount = document.getElementById("promptCount");
+
+// ---- Prompt counter ----
+
+function updatePromptCount() {
+  const lines = promptList.value.split("\n").filter(p => p.trim() !== "");
+  if (lines.length === 0) {
+    promptCount.innerHTML = "";
+  } else {
+    promptCount.innerHTML = `<span>${lines.length}</span> prompt${lines.length === 1 ? "" : "s"} loaded`;
+  }
+}
+
+promptList.addEventListener("input", updatePromptCount);
+
+// ---- File upload ----
+
+uploadBtn.addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const text = event.target.result;
+    let prompts;
+
+    if (file.name.endsWith(".csv") || file.name.endsWith(".tsv")) {
+      // CSV/TSV: take the first column (or the "prompt" column if headers exist)
+      const sep = file.name.endsWith(".tsv") ? "\t" : ",";
+      const rows = text.split("\n").map(r => r.trim()).filter(r => r !== "");
+      if (rows.length === 0) return;
+
+      // Check if first row is a header
+      const firstRow = rows[0].toLowerCase();
+      let promptCol = 0;
+      if (firstRow.includes("prompt")) {
+        const headers = firstRow.split(sep).map(h => h.trim().replace(/"/g, ""));
+        promptCol = headers.findIndex(h => h === "prompt" || h === "prompts" || h === "text");
+        if (promptCol === -1) promptCol = 0;
+        rows.shift(); // remove header
+      }
+
+      prompts = rows.map(row => {
+        const cols = row.split(sep).map(c => c.trim().replace(/^"|"$/g, ""));
+        return cols[promptCol] || "";
+      }).filter(p => p !== "");
+    } else {
+      // Plain text: one prompt per line
+      prompts = text.split("\n").map(p => p.trim()).filter(p => p !== "");
+    }
+
+    promptList.value = prompts.join("\n");
+    updatePromptCount();
+    uploadBtn.textContent = `📄 ${prompts.length} loaded`;
+    setTimeout(() => { uploadBtn.textContent = "📄 Load .txt"; }, 2000);
+  };
+  reader.readAsText(file);
+
+  // Reset input so same file can be re-uploaded
+  fileInput.value = "";
+});
+
+// ---- Check connection on load ----
+
+chrome.runtime.sendMessage({ type: "CHECK_CONNECTION" }, (response) => {
+  if (chrome.runtime.lastError || !response) {
+    statusDot.className = "status-dot disconnected";
+    statusText.textContent = "Extension error — reload the extension.";
+    return;
+  }
+  if (response.connected) {
+    statusDot.className = "status-dot connected";
+    statusText.textContent = "Connected to Flow (Project: " + response.projectId.substring(0, 8) + "…)";
+    startBtn.disabled = false;
+  } else {
+    statusDot.className = "status-dot disconnected";
+    statusText.textContent = response.reason || "Not connected.";
+    startBtn.disabled = true;
+  }
+});
+
+// ---- Start batch ----
+
+startBtn.addEventListener("click", () => {
+  const prompts = promptList.value.split("\n").map(p => p.trim()).filter(p => p !== "");
+
+  if (prompts.length === 0) {
+    alert("Please enter at least one prompt.");
+    return;
+  }
+
+  const settings = {
+    model: document.getElementById("modelSelect").value,
+    aspectRatio: document.getElementById("aspectSelect").value,
+    fileNaming: document.getElementById("namingSelect").value,
+    folder: "Flow_Images",
+    delayMin: 3,
+    delayMax: 8
+  };
+
+  // Clear previous log
+  logContainer.innerHTML = "";
+  logContainer.classList.add("visible");
+  summary.classList.remove("visible");
+
+  // Toggle buttons
+  startBtn.style.display = "none";
+  stopBtn.style.display = "flex";
+  promptList.disabled = true;
+
+  chrome.runtime.sendMessage({ type: "RUN_BATCH", prompts, settings });
+});
+
+// ---- Stop batch ----
+
+stopBtn.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "STOP_BATCH" });
+  stopBtn.disabled = true;
+  stopBtn.textContent = "⏳ Stopping...";
+});
+
+// ---- Listen for progress from background ----
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === "BATCH_PROGRESS") {
+    addLogEntry(message.message, message.status);
+  }
+
+  if (message.type === "BATCH_ERROR") {
+    addLogEntry(message.message, "failed");
+    resetButtons();
+  }
+
+  if (message.type === "BATCH_DONE") {
+    const { completed, failed, total } = message;
+    summary.classList.add("visible");
+    if (failed === 0) {
+      summary.className = "summary visible success";
+      summary.textContent = `🎉 All ${completed} images generated and downloaded!`;
+    } else {
+      summary.className = "summary visible partial";
+      summary.textContent = `Done: ${completed} succeeded, ${failed} failed out of ${total}.`;
+    }
+    resetButtons();
+  }
+});
+
+// ---- Helpers ----
+
+function addLogEntry(text, status = "") {
+  const entry = document.createElement("div");
+  entry.className = "log-entry " + status;
+  entry.textContent = text;
+  logContainer.appendChild(entry);
+  logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function resetButtons() {
+  startBtn.style.display = "flex";
+  stopBtn.style.display = "none";
+  stopBtn.disabled = false;
+  stopBtn.textContent = "⏹ Stop";
+  promptList.disabled = false;
+}

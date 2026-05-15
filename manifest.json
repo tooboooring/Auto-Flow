@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Auto Flow - Bulk MS Paint Generator",
+  "description": "Bulk generate and auto-download images from Google Labs Flow via direct API calls.",
+  "version": "1.0.0",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "downloads",
+    "scripting",
+    "tabs",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://labs.google/*",
+    "https://aisandbox-pa.googleapis.com/*"
+  ],
+  "action": {
+    "default_title": "Auto Flow"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

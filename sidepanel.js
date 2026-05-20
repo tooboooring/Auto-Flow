@@ -110,8 +110,8 @@ startBtn.addEventListener("click", () => {
     aspectRatio: document.getElementById("aspectSelect").value,
     fileNaming: document.getElementById("namingSelect").value,
     folder: "Flow_Images",
-    delayMin: 3,
-    delayMax: 8
+    delayMin: 6,
+    delayMax: 12
   };
 
   // Clear previous log

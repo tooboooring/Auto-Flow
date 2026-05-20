@@ -243,6 +243,11 @@ async function callFlowAPI(tabId, url, body, action = "IMAGE_GENERATION", retryC
       return callFlowAPI(tabId, url, body, action, 1);
     }
     if (response.status === 429 || response.errText?.includes("RESOURCE_EXHAUSTED")) {
+      if (retryCount === 0) {
+        broadcast("BATCH_PROGRESS", { status: "waiting", message: "⚠️ Rate limited (429). Pausing pipeline for 30s before retrying..." });
+        await sleep(30000);
+        return callFlowAPI(tabId, url, body, action, 1);
+      }
       throw new Error("Daily quota reached — try a different model or wait until tomorrow.");
     }
     if (response.status === 400) {
@@ -330,30 +335,40 @@ async function generateImage(tabId, projectId, prompt, settings) {
 async function downloadImage(tabId, mediaId, filename) {
   const mediaUrl = `https://labs.google/fx/api/trpc/media.getMediaUrlRedirect?name=${mediaId}`;
 
-  // Load image in page context → canvas → blob URL (Chrome supports blob URL downloads)
+  // Fetch image as blob directly in the main world context to bypass CORS/canvas restrictions (with retry logic)
   const result = await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
-    func: (url) => new Promise(resolve => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
+    func: async (url) => {
+      const wait = (ms) => new Promise(r => setTimeout(r, ms));
+      let retries = 3;
+      let delay = 2000;
+
+      for (let attempt = 0; attempt < retries; attempt++) {
         try {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          canvas.getContext("2d").drawImage(img, 0, 0);
-          canvas.toBlob(blob => {
-            if (!blob) return resolve({ error: "Failed to convert image to blob" });
-            resolve({ blobUrl: URL.createObjectURL(blob), size: blob.size });
-          }, "image/png");
+          const response = await fetch(url);
+          if (response.status === 429) {
+            if (attempt < retries - 1) {
+              await wait(delay);
+              delay *= 2; // Exponential backoff (2s, 4s, 8s)
+              continue;
+            }
+            throw new Error("HTTP error! status: 429 (Rate limit exceeded after retries)");
+          }
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const blob = await response.blob();
+          return { blobUrl: URL.createObjectURL(blob), size: blob.size };
         } catch (e) {
-          resolve({ error: e.message });
+          if (attempt === retries - 1) {
+            return { error: e.message };
+          }
+          await wait(delay);
+          delay *= 2;
         }
-      };
-      img.onerror = () => resolve({ error: "Image load failed" });
-      img.src = url;
-    }),
+      }
+    },
     args: [mediaUrl]
   }).catch(() => null);
 
@@ -408,8 +423,8 @@ async function runBatch(config) {
 
   let completed = 0;
   let failed = 0;
-  const delayMin = (settings.delayMin ?? 3) * 1000;
-  const delayMax = (settings.delayMax ?? 8) * 1000;
+  const delayMin = (settings.delayMin ?? 6) * 1000;
+  const delayMax = (settings.delayMax ?? 12) * 1000;
 
   for (let i = 0; i < prompts.length; i++) {
     if (stopRequested) {

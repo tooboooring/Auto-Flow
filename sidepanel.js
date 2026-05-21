@@ -5,6 +5,7 @@
 
 const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
+const clearBtn = document.getElementById("clearBtn");
 const promptList = document.getElementById("promptList");
 const logContainer = document.getElementById("logContainer");
 const summary = document.getElementById("summary");
@@ -13,6 +14,8 @@ const statusText = document.getElementById("statusText");
 const uploadBtn = document.getElementById("uploadBtn");
 const fileInput = document.getElementById("fileInput");
 const promptCount = document.getElementById("promptCount");
+
+let resumeIndex = 0;
 
 // ---- Prompt counter ----
 
@@ -122,9 +125,15 @@ startBtn.addEventListener("click", () => {
   // Toggle buttons
   startBtn.style.display = "none";
   stopBtn.style.display = "flex";
+  clearBtn.style.display = "none";
   promptList.disabled = true;
 
-  chrome.runtime.sendMessage({ type: "RUN_BATCH", prompts, settings });
+  // Pass the startIndex parameter to the background script
+  chrome.runtime.sendMessage({ type: "RUN_BATCH", prompts, settings, startIndex: resumeIndex });
+  
+  // Reset the index and button text so manual runs start fresh afterward
+  resumeIndex = 0;
+  startBtn.textContent = "🚀 Start Generating";
 });
 
 // ---- Stop batch ----
@@ -174,7 +183,39 @@ function addLogEntry(text, status = "") {
 function resetButtons() {
   startBtn.style.display = "flex";
   stopBtn.style.display = "none";
+  clearBtn.style.display = "flex";
   stopBtn.disabled = false;
   stopBtn.textContent = "⏹ Stop";
   promptList.disabled = false;
 }
+
+// ---- Clear All ----
+
+clearBtn.addEventListener("click", () => {
+  if (confirm("Are you sure you want to clear all prompts and reset progress?")) {
+    promptList.value = "";
+    updatePromptCount();
+    logContainer.innerHTML = "";
+    logContainer.classList.remove("visible");
+    summary.classList.remove("visible");
+    
+    resumeIndex = 0;
+    startBtn.textContent = "🚀 Start Generating";
+    
+    chrome.storage.local.remove(['batchPrompts', 'batchSettings', 'batchIndex']);
+  }
+});
+
+// ---- Check storage on load ----
+
+chrome.storage.local.get(['batchPrompts', 'batchSettings', 'batchIndex'], (data) => {
+  if (data.batchPrompts && data.batchIndex < data.batchPrompts.length) {
+    promptList.value = data.batchPrompts.join("\n");
+    updatePromptCount();
+    document.getElementById("modelSelect").value = data.batchSettings.model;
+    document.getElementById("aspectSelect").value = data.batchSettings.aspectRatio;
+    
+    resumeIndex = data.batchIndex;
+    startBtn.textContent = `🚀 Resume Generating (from #${resumeIndex + 1})`;
+  }
+});

@@ -312,6 +312,9 @@ async function generateImage(tabId, projectId, prompt, settings) {
 
   const data = await callFlowAPI(tabId, url, requestBody);
 
+  console.log("=== FLOW API RESPONSE DATA ===");
+  console.log(JSON.stringify(data, null, 2));
+
   let mediaId = null;
   if (data?.workflows) {
     for (const w of data.workflows) {
@@ -359,7 +362,13 @@ async function downloadImage(tabId, mediaId, filename) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
           const blob = await response.blob();
-          return { blobUrl: URL.createObjectURL(blob), size: blob.size };
+          
+          const headersObj = {};
+          for (const [key, val] of response.headers.entries()) {
+            headersObj[key] = val;
+          }
+          
+          return { blobUrl: URL.createObjectURL(blob), size: blob.size, debugHeaders: headersObj, debugUrl: response.url };
         } catch (e) {
           if (attempt === retries - 1) {
             return { error: e.message };
@@ -373,6 +382,11 @@ async function downloadImage(tabId, mediaId, filename) {
   }).catch(() => null);
 
   const imgResult = result?.[0]?.result;
+  
+  console.log("=== IMAGE DOWNLOAD HEADERS ===");
+  console.log("Final URL:", imgResult?.debugUrl);
+  console.log("Headers:", JSON.stringify(imgResult?.debugHeaders, null, 2));
+  
   if (!imgResult?.blobUrl) {
     throw new Error("Download failed: " + (imgResult?.error || "unknown"));
   }
@@ -404,7 +418,7 @@ async function downloadImage(tabId, mediaId, filename) {
 // ---- Batch Processing ----
 
 async function runBatch(config) {
-  const { prompts, settings } = config;
+  const { prompts, settings, startIndex = 0 } = config;
   stopRequested = false;
 
   const tab = await findFlowTab();
@@ -426,7 +440,7 @@ async function runBatch(config) {
   const delayMin = (settings.delayMin ?? 6) * 1000;
   const delayMax = (settings.delayMax ?? 12) * 1000;
 
-  for (let i = 0; i < prompts.length; i++) {
+  for (let i = startIndex; i < prompts.length; i++) {
     if (stopRequested) {
       broadcast("BATCH_PROGRESS", { index: i, total: prompts.length, status: "stopped", message: "Stopped by user." });
       break;
@@ -461,6 +475,14 @@ async function runBatch(config) {
       await downloadImage(tab.id, mediaId, filename);
 
       completed++;
+      
+      // SAVE PROGRESS TO LOCAL STORAGE
+      chrome.storage.local.set({
+        batchPrompts: prompts,
+        batchSettings: settings,
+        batchIndex: i + 1
+      });
+
       broadcast("BATCH_PROGRESS", {
         index: i, total: prompts.length, status: "done",
         message: `[${i + 1}/${prompts.length}] ✅ Saved: ${filename}`
@@ -491,6 +513,11 @@ async function runBatch(config) {
   }
 
   broadcast("BATCH_DONE", { completed, failed, total: prompts.length });
+  
+  // CLEAR STORAGE WHEN ENTIRE QUEUE IS FINISHED
+  if (!stopRequested && failed === 0) {
+    chrome.storage.local.remove(['batchPrompts', 'batchSettings', 'batchIndex']);
+  }
 
   if (completed > 0 && tab.id) {
     await sleep(300);

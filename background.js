@@ -421,6 +421,17 @@ async function runBatch(config) {
   const { prompts, settings, startIndex = 0 } = config;
   stopRequested = false;
 
+  const variables = {};
+  if (settings.variablesText && settings.variablesText.trim() !== "") {
+    const lines = settings.variablesText.split("\n");
+    for (const line of lines) {
+      const match = line.match(/^\[(.*?)\]\s*=\s*(.*)$/);
+      if (match) {
+        variables[match[1].trim().toLowerCase()] = match[2].trim();
+      }
+    }
+  }
+
   const tab = await findFlowTab();
   if (!tab?.id) {
     broadcast("BATCH_ERROR", { message: "No Google Flow tab found. Open a Flow project first!" });
@@ -446,7 +457,15 @@ async function runBatch(config) {
       break;
     }
 
-    const prompt = prompts[i];
+    let prompt = prompts[i];
+    
+    // Apply dynamic variables
+    for (const [key, value] of Object.entries(variables)) {
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\[${escapedKey}\\]`, 'gi');
+      prompt = prompt.replace(regex, value);
+    }
+
     const promptPreview = prompt.substring(0, 60) + (prompt.length > 60 ? "…" : "");
 
     broadcast("BATCH_PROGRESS", {

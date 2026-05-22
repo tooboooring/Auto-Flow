@@ -7,6 +7,7 @@ const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const clearBtn = document.getElementById("clearBtn");
 const promptList = document.getElementById("promptList");
+const variablesList = document.getElementById("variablesList");
 const logContainer = document.getElementById("logContainer");
 const summary = document.getElementById("summary");
 const statusDot = document.getElementById("statusDot");
@@ -114,7 +115,8 @@ startBtn.addEventListener("click", () => {
     fileNaming: document.getElementById("namingSelect").value,
     folder: "Flow_Images",
     delayMin: 6,
-    delayMax: 12
+    delayMax: 12,
+    variablesText: variablesList.value
   };
 
   // Clear previous log
@@ -194,6 +196,7 @@ function resetButtons() {
 clearBtn.addEventListener("click", () => {
   if (confirm("Are you sure you want to clear all prompts and reset progress?")) {
     promptList.value = "";
+    variablesList.value = "";
     updatePromptCount();
     logContainer.innerHTML = "";
     logContainer.classList.remove("visible");
@@ -214,6 +217,9 @@ chrome.storage.local.get(['batchPrompts', 'batchSettings', 'batchIndex'], (data)
     updatePromptCount();
     document.getElementById("modelSelect").value = data.batchSettings.model;
     document.getElementById("aspectSelect").value = data.batchSettings.aspectRatio;
+    if (data.batchSettings.variablesText) {
+      variablesList.value = data.batchSettings.variablesText;
+    }
     
     resumeIndex = data.batchIndex;
     startBtn.textContent = `🚀 Resume Generating (from #${resumeIndex + 1})`;

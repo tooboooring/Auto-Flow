@@ -6,6 +6,7 @@
 const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const clearBtn = document.getElementById("clearBtn");
+const retryBtn = document.getElementById("retryBtn");
 const promptList = document.getElementById("promptList");
 const variablesList = document.getElementById("variablesList");
 const logContainer = document.getElementById("logContainer");
@@ -159,14 +160,22 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message.type === "BATCH_DONE") {
-    const { completed, failed, total } = message;
+    const { completed, failed, total, failedNums } = message;
     summary.classList.add("visible");
     if (failed === 0) {
       summary.className = "summary visible success";
       summary.textContent = `🎉 All ${completed} images generated and downloaded!`;
+      retryBtn.style.display = "none";
     } else {
       summary.className = "summary visible partial";
+      const failedList = failedNums && failedNums.length > 0 ? failedNums.join(", ") : "";
       summary.textContent = `Done: ${completed} succeeded, ${failed} failed out of ${total}.`;
+      if (failedList) {
+        summary.textContent += ` Failed images: ${failedList}`;
+      }
+      retryBtn.style.display = "flex";
+      retryBtn.textContent = `🔄 Retry Failed (${failedList})`;
+      retryBtn.disabled = false;
     }
     resetButtons();
   }
@@ -191,6 +200,24 @@ function resetButtons() {
   promptList.disabled = false;
 }
 
+// ---- Retry Failed ----
+
+retryBtn.addEventListener("click", () => {
+  // Clear previous log
+  logContainer.innerHTML = "";
+  logContainer.classList.add("visible");
+  summary.classList.remove("visible");
+
+  // Toggle buttons
+  startBtn.style.display = "none";
+  retryBtn.style.display = "none";
+  stopBtn.style.display = "flex";
+  clearBtn.style.display = "none";
+  promptList.disabled = true;
+
+  chrome.runtime.sendMessage({ type: "RETRY_FAILED" });
+});
+
 // ---- Clear All ----
 
 clearBtn.addEventListener("click", () => {
@@ -201,17 +228,18 @@ clearBtn.addEventListener("click", () => {
     logContainer.innerHTML = "";
     logContainer.classList.remove("visible");
     summary.classList.remove("visible");
+    retryBtn.style.display = "none";
     
     resumeIndex = 0;
     startBtn.textContent = "🚀 Start Generating";
     
-    chrome.storage.local.remove(['batchPrompts', 'batchSettings', 'batchIndex']);
+    chrome.storage.local.remove(['batchPrompts', 'batchSettings', 'batchIndex', 'failedImages']);
   }
 });
 
 // ---- Check storage on load ----
 
-chrome.storage.local.get(['batchPrompts', 'batchSettings', 'batchIndex'], (data) => {
+chrome.storage.local.get(['batchPrompts', 'batchSettings', 'batchIndex', 'failedImages'], (data) => {
   if (data.batchPrompts && data.batchIndex < data.batchPrompts.length) {
     promptList.value = data.batchPrompts.join("\n");
     updatePromptCount();
@@ -223,5 +251,15 @@ chrome.storage.local.get(['batchPrompts', 'batchSettings', 'batchIndex'], (data)
     
     resumeIndex = data.batchIndex;
     startBtn.textContent = `🚀 Resume Generating (from #${resumeIndex + 1})`;
+  }
+
+  // Show retry button if there are persisted failed images
+  if (data.failedImages && data.failedImages.length > 0) {
+    const failedNums = data.failedImages.map(f => f.imageNum).join(", ");
+    retryBtn.style.display = "flex";
+    retryBtn.textContent = `🔄 Retry Failed (${failedNums})`;
+    summary.classList.add("visible");
+    summary.className = "summary visible partial";
+    summary.textContent = `${data.failedImages.length} failed image(s) from previous run. Failed: ${failedNums}`;
   }
 });

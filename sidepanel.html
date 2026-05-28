@@ -156,6 +156,14 @@
     }
     .btn-stop:hover { box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
 
+    .btn-retry {
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: white;
+      display: none;
+    }
+    .btn-retry:hover { box-shadow: 0 4px 12px rgba(249,115,22,0.3); }
+    .btn-retry:disabled { opacity: 0.4; cursor: not-allowed; }
+
     .btn-clear {
       background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.1);
@@ -320,6 +328,7 @@
   <!-- Action Buttons -->
   <button class="btn btn-start" id="startBtn">🚀 Start Generating</button>
   <button class="btn btn-stop" id="stopBtn">⏹ Stop</button>
+  <button class="btn btn-retry" id="retryBtn">🔄 Retry Failed</button>
   <button class="btn btn-clear" id="clearBtn">🗑️ Clear All</button>
 
   <!-- Divider -->

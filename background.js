@@ -21,17 +21,14 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => 
 const pendingFilenames = new Map();
 
 chrome.downloads.onDeterminingFilename.addListener((downloadItem, suggest) => {
-  const desiredName = pendingFilenames.get(downloadItem.id);
+  const desiredName = pendingFilenames.get(downloadItem.url);
   if (desiredName) {
+    pendingFilenames.delete(downloadItem.url);
     suggest({ filename: desiredName, conflictAction: "uniquify" });
   }
 });
 
-chrome.downloads.onChanged.addListener((delta) => {
-  if (delta.state && (delta.state.current === "complete" || delta.state.current === "interrupted")) {
-    pendingFilenames.delete(delta.id);
-  }
-});
+
 
 // ---- Utilities ----
 
@@ -391,6 +388,10 @@ async function downloadImage(tabId, mediaId, filename) {
     throw new Error("Download failed: " + (imgResult?.error || "unknown"));
   }
 
+  // Register the desired filename BEFORE starting the download
+  // so onDeterminingFilename can enforce it (no race condition)
+  pendingFilenames.set(imgResult.blobUrl, filename);
+
   // Chrome supports blob URL downloads natively — save to Flow_Images/ folder
   await new Promise((resolve, reject) => {
     chrome.downloads.download({
@@ -400,8 +401,6 @@ async function downloadImage(tabId, mediaId, filename) {
       conflictAction: "uniquify"
     }, (downloadId) => {
       if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-      // Register the desired filename so onDeterminingFilename can enforce it
-      pendingFilenames.set(downloadId, filename);
       resolve(downloadId);
     });
   });

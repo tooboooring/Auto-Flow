@@ -172,6 +172,37 @@
     }
     .btn-clear:hover { background: rgba(255,255,255,0.1); }
 
+    .btn-export {
+      background: rgba(34,197,94,0.15);
+      border: 1px solid rgba(34,197,94,0.3);
+      color: #22c55e;
+      display: none;
+      font-size: 11px;
+      padding: 6px 10px;
+      margin-top: 0;
+    }
+    .btn-export:hover { background: rgba(34,197,94,0.25); }
+
+    .btn-import {
+      background: rgba(56,189,248,0.15);
+      border: 1px solid rgba(56,189,248,0.3);
+      color: #38bdf8;
+      font-size: 11px;
+      padding: 6px 10px;
+      margin-top: 0;
+    }
+    .btn-import:hover { background: rgba(56,189,248,0.25); }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .btn-row .btn {
+      flex: 1;
+      margin-top: 0;
+    }
+
     /* File upload */
     .upload-row {
       display: flex;
@@ -330,6 +361,11 @@
   <button class="btn btn-stop" id="stopBtn">⏹ Stop</button>
   <button class="btn btn-retry" id="retryBtn">🔄 Retry Failed</button>
   <button class="btn btn-clear" id="clearBtn">🗑️ Clear All</button>
+  <div class="btn-row">
+    <button class="btn btn-export" id="exportBtn">📥 Export</button>
+    <button class="btn btn-import" id="importBtn">📤 Import</button>
+  </div>
+  <input type="file" id="importFileInput" accept=".json" style="display: none;">
 
   <!-- Divider -->
   <div class="divider"></div>

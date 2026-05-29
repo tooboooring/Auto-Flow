@@ -101,6 +101,21 @@
     textarea:focus { border-color: #3b82f680; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
     textarea::placeholder { color: #484f58; }
 
+    input[type="text"] {
+      width: 100%;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: #e6edf3;
+      font-size: 13px;
+      margin-bottom: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus { border-color: #3b82f680; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    input[type="text"]::placeholder { color: #484f58; }
+
     select {
       width: 100%;
       background: rgba(255,255,255,0.03);
@@ -347,10 +362,17 @@
     </div>
   </div>
 
-  <select id="namingSelect">
-    <option value="number" selected>📁 Name by Number (001, 002...)</option>
-    <option value="prompt">📝 Name by Prompt Text</option>
-  </select>
+  <div class="row">
+    <div>
+      <select id="namingSelect">
+        <option value="number" selected>📁 Name by Number (001, 002...)</option>
+        <option value="prompt">📝 Name by Prompt Text</option>
+      </select>
+    </div>
+    <div>
+      <input type="text" id="folderInput" value="Flow_Images" placeholder="Save Folder Name" />
+    </div>
+  </div>
 
   <!-- Variables -->
   <div class="section-title">Variables (Optional)</div>

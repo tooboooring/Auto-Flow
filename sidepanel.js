@@ -115,7 +115,7 @@ startBtn.addEventListener("click", () => {
     model: document.getElementById("modelSelect").value,
     aspectRatio: document.getElementById("aspectSelect").value,
     fileNaming: document.getElementById("namingSelect").value,
-    folder: "Flow_Images",
+    folder: document.getElementById("folderInput").value.trim() || "Flow_Images",
     delayMin: 6,
     delayMax: 12,
     variablesText: variablesList.value
@@ -308,6 +308,7 @@ importFileInput.addEventListener("change", (e) => {
             if (manifest.settings.model) document.getElementById("modelSelect").value = manifest.settings.model;
             if (manifest.settings.aspectRatio) document.getElementById("aspectSelect").value = manifest.settings.aspectRatio;
             if (manifest.settings.fileNaming) document.getElementById("namingSelect").value = manifest.settings.fileNaming;
+            if (manifest.settings.folder) document.getElementById("folderInput").value = manifest.settings.folder;
             if (manifest.settings.variablesText) variablesList.value = manifest.settings.variablesText;
           }
 
@@ -388,6 +389,7 @@ chrome.storage.local.get(['manifest'], (data) => {
     if (manifest.settings.model) document.getElementById("modelSelect").value = manifest.settings.model;
     if (manifest.settings.aspectRatio) document.getElementById("aspectSelect").value = manifest.settings.aspectRatio;
     if (manifest.settings.fileNaming) document.getElementById("namingSelect").value = manifest.settings.fileNaming;
+    if (manifest.settings.folder) document.getElementById("folderInput").value = manifest.settings.folder;
     if (manifest.settings.variablesText) variablesList.value = manifest.settings.variablesText;
   }
 

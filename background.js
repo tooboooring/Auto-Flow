@@ -589,6 +589,7 @@ async function processEntries(entries, manifest, settings, logPrefix = "") {
 
   broadcast("BATCH_DONE", {
     completed,
+    doneCount,
     failed: failedEntries.length,
     pending: pendingEntries.length,
     total: manifest.prompts.length,

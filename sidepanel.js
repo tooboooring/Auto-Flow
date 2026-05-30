@@ -167,18 +167,19 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message.type === "BATCH_DONE") {
-    const { completed, failed, pending, total, failedNums, pendingNums } = message;
+    const { completed, doneCount, failed, pending, total, failedNums, pendingNums } = message;
     summary.classList.add("visible");
 
     if (failed === 0 && pending === 0) {
       summary.className = "summary visible success";
-      summary.textContent = `🎉 All ${completed} images generated and downloaded!`;
+      summary.textContent = `🎉 All ${total} images generated and downloaded!`;
+      startBtn.textContent = "🚀 Start Generating";
       retryBtn.style.display = "none";
       exportBtn.style.display = "none";
     } else {
       summary.className = "summary visible partial";
 
-      let summaryText = `Done: ${completed} succeeded`;
+      let summaryText = `Done: ${doneCount !== undefined ? doneCount : completed} succeeded`;
       if (failed > 0) summaryText += `, ${failed} failed`;
       if (pending > 0) summaryText += `, ${pending} pending`;
       summaryText += ` out of ${total}.`;
